@@ -35,6 +35,12 @@ CREATE TABLE characteristic_reviews(
   value INTEGER NOT NULL
 );
 
+CREATE TABLE characteristics(
+  id INTEGER NOT NULL PRIMARY KEY,
+  product_id INTEGER NOT NULL,
+  name VARCHAR NOT NULL
+);
+
 --  Not using for now
 ALTER TABLE reviews ADD FOREIGN KEY (id_photos) REFERENCES reviews_photos (id);
 ALTER TABLE reviews ADD FOREIGN KEY (id_characteristics) REFERENCES characteristic_reviews (id);
@@ -42,6 +48,7 @@ ALTER TABLE reviews ADD FOREIGN KEY (id_characteristics) REFERENCES characterist
 \copy reviews FROM '/Users/rizztown/Desktop/SDC/reviews.csv' DELIMITER ',' null as 'null' CSV header;
 \copy reviews_photos FROM '/Users/rizztown/Desktop/SDC/reviews_photos.csv' DELIMITER ',' CSV header;
 \copy characteristic_reviews FROM '/Users/rizztown/Desktop/SDC/characteristic_reviews.csv' DELIMITER ',' CSV header;
+\copy characteristics FROM '/Users/rizztown/Desktop/SDC/characteristics.csv' DELIMITER ',' CSV header;
 
 -- Building
 
