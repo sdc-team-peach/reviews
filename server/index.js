@@ -32,7 +32,6 @@ app.get("/reviews", async(req, res) => {
     // console.log('In get reviews;req.params: ', req.params);
     // console.log('In get reviews;req.body: ', req.body);
     const { count, sort, product_id } = req.query;
-    const resultObj = {};
     const infoStuff = await pool.query(`
     SELECT
       body,
@@ -55,10 +54,16 @@ app.get("/reviews", async(req, res) => {
       ) p JOIN reviews ON reviews.id = p.review_id
     WHERE reviews.product_id = $1
     `, [product_id]);
-    console.log(infoStuff.rows);
-    // console.log('Get query limit 5 from reviews: ');
-    // const obj = {results: [{body: "bla bla", date: "2022-02-22T00:00:00.000Z", helpfulness: 63, photos: [], rating: 5, recommend: false, response: null, review_id: 1135857, reviewer_name: "poop", summary: "this bla"}, {body: "second bla", date: "2022-02-22T00:00:00.000Z", helpfulness: 53, photos: [], rating: 3, recommend: false, response: null, review_id: 1134857, reviewer_name: "pop", summary: "this still bla"}]};
-    res.json(infoStuff.rows);
+    // console.log(infoStuff.rows);
+    // console.log('infoStuff: ', infoStuff);
+    // result object to send to front end
+    const resultObj = {
+      product: product_id,
+      page: 0,
+      count: infoStuff.rowCount,
+      results: infoStuff.rows,
+    };
+    res.json(resultObj);
   } catch (err) {
     console.error(err.message)
   }
