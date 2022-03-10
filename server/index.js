@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
+// Do I need cors?
 const cors = require("cors");
 const pool = require("./db");
 
@@ -10,16 +11,20 @@ app.use(express.json());
 
 const port = process.env.PORT || 5000;
 
+
+// Since this is a micro service, would it be better to have all this in one file or should it be split into mvc? (models, controller)
+// I thought since we are deploying it would be better not to have extra stuff... but let me know if I should use models and controller
+
+
 //Routes//
 
-//create review --NOT DONE YET--
 app.post("/reviews", async (req, res) => {
   try {
     console.log('IN post; req.body: ', req.body);
     const { product_id, name, body, rating, summary, recommend, photos, characteristics, } = req.body;
     const nowTime = new Date().getTime();
     const newReview = await pool.query(
-      "INSERT INTO reviews (product_id, reviewer_name, body, rating, summary, recommend, characteristics, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      'INSERT INTO reviews (product_id, reviewer_name, body, rating, summary, recommend, characteristics, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
       [product_id, name, body, rating, summary, recommend, characteristics, nowTime]
     );
     res.sendStatus(201);
@@ -29,39 +34,15 @@ app.post("/reviews", async (req, res) => {
 });
 
 
-//get reviews  --NOT DONE YET--
+// How should I format query strings? I've learned you shouldnt use template literals because of security concerns (injecting scripts)
+// The query string is just super long now though on one line. Should I just concatenate multiple strings together?
 
 app.get("/reviews", async (req, res) => {
   try {
-    console.log('In get reviews;req: ', req.query);
-    // console.log('In get reviews;req.params: ', req.params);
-    // console.log('In get reviews;req.body: ', req.body);
     const { count, sort, product_id } = req.query;
-    const infoStuff = await pool.query(`
-    SELECT
-      body,
-      date,
-      helpfulness,
-      rating,
-      recommend,
-      response,
-      reviews.id AS review_id,
-      reviewer_name,
-      summary,
-      p.photos
-      FROM (
-        SELECT
-        array_agg(reviews_photos.url) AS photos,
-        review_id
-        FROM
-        reviews_photos
-        GROUP BY review_id
-      ) p JOIN reviews ON reviews.id = p.review_id
-    WHERE reviews.product_id = $1
-    `, [product_id]);
-    // console.log(infoStuff.rows);
-    // console.log('infoStuff: ', infoStuff);
-    // result object to send to front end
+
+    const infoStuff = await pool.query('SELECT body, date, helpfulness, rating, recommend, response, reviews.id AS review_id, reviewer_name, summary, p.photos FROM (SELECT array_agg(reviews_photos.url) AS photos, review_id FROM reviews_photos GROUP BY review_id) p JOIN reviews ON reviews.id = p.review_id WHERE reviews.product_id = $1', [product_id]);
+
     const resultObj = {
       product: product_id,
       page: 0,
@@ -82,36 +63,10 @@ app.get("/reviews", async (req, res) => {
 app.get("/reviews/meta/:product_id", async (req, res) => {
   try {
     const { product_id } = req.params;
-    const reviewData = await pool.query(`
-    SELECT
 
-      cvalue,
-      cid,
-      reviews.id,
-      recommend,
-      product_id,
-      rating
+    const reviewData = await pool.query('SELECT cvalue, cid, reviews.id, recommend, product_id, rating FROM (SELECT ARRAY_AGG(characteristic_reviews.value) AS cvalue, ARRAY_AGG(characteristic_reviews.characteristic_id) AS cid, review_id FROM characteristic_reviews GROUP BY review_id) cr JOIN reviews on cr.review_id = reviews.id WHERE product_id = $1', [product_id]);
 
-    FROM (
-      SELECT
-        ARRAY_AGG(characteristic_reviews.value) AS cvalue,
-        ARRAY_AGG(characteristic_reviews.characteristic_id) AS cid,
-        review_id
-      FROM
-        characteristic_reviews
-
-      GROUP BY
-        review_id) cr JOIN reviews on cr.review_id = reviews.id
-
-    WHERE product_id = $1
-    `, [product_id]);
-
-    const characteristicNames = await pool.query(`
-    select id, name from characteristics where product_id = $1
-    `, [product_id]);
-
-    console.log('in meta!!!!% ', reviewData.rows);
-    console.log('characterNames: ', characteristicNames.rows);
+    const characteristicNames = await pool.query('select id, name from characteristics where product_id = $1', [product_id]);
 
     const resultObj = {
       product_id: product_id,
@@ -124,10 +79,8 @@ app.get("/reviews/meta/:product_id", async (req, res) => {
     for (let i = 0; i < reviewData.rows.length; i++) {
       // ratings
       resultObj.ratings[reviewData.rows[i].rating]++;
-
       // recommended
       resultObj.recommended[reviewData.rows[i].recommend]++;
-
       // characteristics
       for (let k = 0; k < reviewData.rows[i].cid.length; k++) {
         if (characteristicsObj[reviewData.rows[i].cid[k]]) {
@@ -137,7 +90,6 @@ app.get("/reviews/meta/:product_id", async (req, res) => {
         }
       }
     }
-
     // characteristics
     for (let i = 0; i < characteristicNames.rows.length; i++) {
       resultObj.characteristics[characteristicNames.rows[i].name] = {
@@ -145,10 +97,6 @@ app.get("/reviews/meta/:product_id", async (req, res) => {
         value: characteristicsObj[characteristicNames.rows[i].id] / reviewData.rows.length,
       }
     }
-
-    console.log(characteristicsObj);
-    // result object to send to front end
-
     res.json(resultObj);
   } catch (err) {
     console.error(err.message)
@@ -156,33 +104,21 @@ app.get("/reviews/meta/:product_id", async (req, res) => {
 })
 
 
-
-//put reviews (helpful, reported) -- Should be done --
-
 app.put("/reviews/:review_id/helpful", async (req, res) => {
   try {
-    // console.log('In put reviews;req.query: ', req.query);
-    console.log('In put reviews helpful;req.params: ', req.params);
-    // console.log('In get reviews;req.body: ', req.body);
     const { review_id } = req.params;
     const infoStuff = await pool.query('UPDATE reviews SET helpfulness = helpfulness + 1 WHERE id = $1', [review_id]);
-    // console.log(infoStuff.rows);
-    // console.log('infoStuff: ', infoStuff);
     res.sendStatus(204);
   } catch (err) {
     console.error(err.message)
   }
 })
 
+
 app.put("/reviews/:review_id/report", async (req, res) => {
   try {
-    // console.log('In put reviews;req.query: ', req.query);
-    console.log('In put reviews report;req.params: ', req.params);
-    // console.log('In get reviews;req.body: ', req.body);
     const { review_id } = req.params;
     const infoStuff = await pool.query('UPDATE reviews SET reported = true WHERE id = $1', [review_id]);
-    // console.log(infoStuff.rows);
-    // console.log('infoStuff: ', infoStuff);
     res.sendStatus(204);
   } catch (err) {
     console.error(err.message)
