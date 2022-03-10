@@ -24,8 +24,8 @@ app.post("/reviews", async (req, res) => {
     const { product_id, name, body, rating, summary, recommend, photos, characteristics, } = req.body;
     const nowTime = new Date().getTime();
     const newReview = await pool.query(
-      'INSERT INTO reviews (product_id, reviewer_name, body, rating, summary, recommend, characteristics, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [product_id, name, body, rating, summary, recommend, characteristics, nowTime]
+      'INSERT INTO reviews (product_id, reviewer_name, body, rating, summary, recommend, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [product_id, name, body, rating, summary, recommend, nowTime]
     );
     res.sendStatus(201);
   } catch (err) {
