@@ -13,7 +13,7 @@ const port = process.env.PORT || 5000;
 //Routes//
 
 //create review --NOT DONE YET--
-app.post("/reviews", async(req, res) => {
+app.post("/reviews", async (req, res) => {
   try {
     console.log('IN post; req.body: ', req.body);
     const { product_id, name, body, rating, summary, recommend, photos, characteristics, } = req.body;
@@ -31,7 +31,7 @@ app.post("/reviews", async(req, res) => {
 
 //get reviews  --NOT DONE YET--
 
-app.get("/reviews", async(req, res) => {
+app.get("/reviews", async (req, res) => {
   try {
     console.log('In get reviews;req: ', req.query);
     // console.log('In get reviews;req.params: ', req.params);
@@ -75,51 +75,80 @@ app.get("/reviews", async(req, res) => {
 })
 
 
-//get review meta data --NOT DONE YET--
+// Is it better to use req.query or req.params?
+// (query way) app.get("/reviews/meta", async (req, res) => {...
+// (query way) const { product_id } = req.params;
 
-app.get("/reviews/meta", async(req, res) => {
+app.get("/reviews/meta/:product_id", async (req, res) => {
   try {
-    console.log('In get reviews/meta;req: ', req.query);
-    // console.log('In get reviews;req.params: ', req.params);
-    // console.log('In get reviews;req.body: ', req.body);
-    const { product_id } = req.query;
-    const infoStuff = await pool.query(`
+    const { product_id } = req.params;
+    const reviewData = await pool.query(`
     SELECT
-      rating,
+
+      cvalue,
+      cid,
+      reviews.id,
       recommend,
-      reviews.id AS review_id,
-      c.id,
-      c.product_id,
-      c.name
-      FROM (
-        SELECT
-        *
-        FROM
-        characteristics
-        GROUP BY product_id
-      ) c JOIN reviews ON reviews.product_id = c.product_id
-    WHERE reviews.product_id = $1
+      product_id,
+      rating
+
+    FROM (
+      SELECT
+        ARRAY_AGG(characteristic_reviews.value) AS cvalue,
+        ARRAY_AGG(characteristic_reviews.characteristic_id) AS cid,
+        review_id
+      FROM
+        characteristic_reviews
+
+      GROUP BY
+        review_id) cr JOIN reviews on cr.review_id = reviews.id
+
+    WHERE product_id = $1
     `, [product_id]);
-    console.log(infoStuff);
-    // console.log(infoStuff.rows);
-    // console.log('infoStuff: ', infoStuff);
-    // result object to send to front end
+
+    const characteristicNames = await pool.query(`
+    select id, name from characteristics where product_id = $1
+    `, [product_id]);
+
+    console.log('in meta!!!!% ', reviewData.rows);
+    console.log('characterNames: ', characteristicNames.rows);
+
     const resultObj = {
       product_id: product_id,
-      ratings: {
-        1: 23
-      },
-      recommend: {
-        false: 123,
-        true: 323
-      },
-      characteristics: {
-        fit: {
-          id: 1234321,
-          value: 3
-        }
-      },
+      ratings: {1:0, 2:0, 3:0, 4:0, 5:0},
+      recommended: {false:0, true:0},
+      characteristics: {},
     };
+
+    const characteristicsObj = {};
+    for (let i = 0; i < reviewData.rows.length; i++) {
+      // ratings
+      resultObj.ratings[reviewData.rows[i].rating]++;
+
+      // recommended
+      resultObj.recommended[reviewData.rows[i].recommend]++;
+
+      // characteristics
+      for (let k = 0; k < reviewData.rows[i].cid.length; k++) {
+        if (characteristicsObj[reviewData.rows[i].cid[k]]) {
+          characteristicsObj[reviewData.rows[i].cid[k]] = characteristicsObj[reviewData.rows[i].cid[k]] + reviewData.rows[i].cvalue[k];
+        } else {
+          characteristicsObj[reviewData.rows[i].cid[k]] = reviewData.rows[i].cvalue[k];
+        }
+      }
+    }
+
+    // characteristics
+    for (let i = 0; i < characteristicNames.rows.length; i++) {
+      resultObj.characteristics[characteristicNames.rows[i].name] = {
+        id: characteristicNames.rows[i].id,
+        value: characteristicsObj[characteristicNames.rows[i].id] / reviewData.rows.length,
+      }
+    }
+
+    console.log(characteristicsObj);
+    // result object to send to front end
+
     res.json(resultObj);
   } catch (err) {
     console.error(err.message)
@@ -130,7 +159,7 @@ app.get("/reviews/meta", async(req, res) => {
 
 //put reviews (helpful, reported) -- Should be done --
 
-app.put("/reviews/:review_id/helpful", async(req, res) => {
+app.put("/reviews/:review_id/helpful", async (req, res) => {
   try {
     // console.log('In put reviews;req.query: ', req.query);
     console.log('In put reviews helpful;req.params: ', req.params);
@@ -145,7 +174,7 @@ app.put("/reviews/:review_id/helpful", async(req, res) => {
   }
 })
 
-app.put("/reviews/:review_id/report", async(req, res) => {
+app.put("/reviews/:review_id/report", async (req, res) => {
   try {
     // console.log('In put reviews;req.query: ', req.query);
     console.log('In put reviews report;req.params: ', req.params);
