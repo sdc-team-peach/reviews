@@ -6,3 +6,4 @@ ignore.js
 db.js
 newrelic_agent.log
 newrelic.config.js
+package-lock.json
